@@ -1,0 +1,816 @@
+<div class="page-container">
+    <!-- Page Header -->
+    <header class="page-header animate-slide-in">
+        <div class="header-content">
+            <h1 class="page-title">Historique des Transactions</h1>
+            <p class="page-subtitle">
+                {{ accountId ? 'Transactions du compte ' + accountId : 'Toutes les transactions bancaires' }}
+            </p>
+        </div>
+        <div class="header-actions">
+            <button *ngIf="accountId" (click)="openStatementModal()" class="btn btn-secondary">
+                <i class="ri-file-pdf-line"></i> Relevé PDF
+            </button>
+            <a *ngIf="accountId" routerLink="/transactions" class="btn btn-secondary">
+                <i class="ri-list-check"></i> Voir tout
+            </a>
+            <a [routerLink]="['/transactions/new']" [queryParams]="accountId ? {accountId: accountId} : {}"
+                class="btn btn-primary">
+                <i class="ri-add-line"></i> Nouvelle Transaction
+            </a>
+        </div>
+    </header>
+
+    <!-- Loading State -->
+    <div *ngIf="isLoading" class="animate-slide-in">
+        <!-- Account Summary Skeleton -->
+        <div class="stats-grid mb-6" *ngIf="accountId">
+            <div *ngFor="let i of [1,2,3,4]" class="stat-card">
+                <div class="skeleton skeleton-text mb-2" style="width: 40%;"></div>
+                <div class="skeleton" style="height: 2rem; width: 60%;"></div>
+            </div>
+        </div>
+
+        <!-- Transactions List Skeleton -->
+        <div class="card overflow-hidden">
+            <div class="card-header">
+                <div class="skeleton skeleton-text" style="width: 150px;"></div>
+            </div>
+            <div *ngFor="let i of [1,2,3,4,5]" class="transaction-skeleton">
+                <div class="skeleton" style="width: 48px; height: 48px; border-radius: 12px;"></div>
+                <div class="flex-1">
+                    <div class="skeleton skeleton-text mb-2" style="width: 40%;"></div>
+                    <div class="skeleton skeleton-text" style="width: 60%; height: 0.7rem;"></div>
+                </div>
+                <div class="skeleton" style="width: 100px; height: 1.5rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error State -->
+    <div *ngIf="errorMessage && !isLoading" class="alert alert-danger mb-6 animate-slide-in">
+        <i class="ri-error-warning-line text-xl"></i>
+        <div class="flex-1">
+            <div class="font-semibold">Erreur</div>
+            <div class="text-sm opacity-80">{{ errorMessage }}</div>
+        </div>
+        <a *ngIf="!accountId" routerLink="/accounts" class="btn btn-secondary btn-sm">
+            <i class="ri-wallet-3-line"></i> Sélectionner un compte
+        </a>
+    </div>
+
+    <!-- Account Summary -->
+    <div *ngIf="selectedAccount && !isLoading" class="stats-grid mb-6 animate-slide-in">
+        <div class="stat-card highlight">
+            <div class="stat-icon">
+                <i class="ri-money-dollar-circle-line"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Solde actuel</span>
+                <span class="stat-value" [class.positive]="selectedAccount.solde > 0"
+                    [class.negative]="selectedAccount.solde <= 0">
+                    {{ selectedAccount.solde | number:'1.0-0' }} FCFA
+                </span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon purple">
+                <i class="ri-wallet-3-line"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Type de compte</span>
+                <span class="stat-value">{{ getAccountTypeDisplay(selectedAccount.typeCompte) }}</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon cyan">
+                <i class="ri-bank-card-line"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Numéro de compte</span>
+                <span class="stat-value mono">{{ selectedAccount.numeroCompte }}</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon orange">
+                <i class="ri-exchange-funds-line"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Transactions</span>
+                <span class="stat-value">{{ transactions.length }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transactions List -->
+    <div *ngIf="!isLoading && transactions.length > 0" class="card overflow-hidden animate-slide-in">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="ri-history-line"></i>
+                {{ accountId ? 'Transactions du compte' : 'Toutes les transactions' }}
+            </h3>
+            <span class="transaction-count">{{ transactions.length }}</span>
+        </div>
+
+        <div class="transactions-list">
+            <div *ngFor="let txn of transactions" class="transaction-item">
+                <div class="txn-icon" [class.deposit]="txn.type === 'DEPOT' || txn.type === 'VIREMENT_ENTRANT'"
+                    [class.withdrawal]="txn.type === 'RETRAIT' || txn.type === 'VIREMENT_SORTANT'">
+                    <i [class]="getTypeIcon(txn.type)"></i>
+                </div>
+
+                <div class="txn-info">
+                    <div class="txn-title">
+                        {{ getTypeDisplay(txn.type) }}
+                        <span *ngIf="!accountId && txn.numeroCompte" class="txn-account">
+                            {{ txn.numeroCompte }}
+                        </span>
+                    </div>
+                    <div class="txn-meta">
+                        <span *ngIf="txn.description" class="txn-desc">{{ txn.description }}</span>
+                        <span class="txn-date">
+                            <i class="ri-time-line"></i> {{ txn.dateTransaction | date:'dd MMM yyyy, HH:mm' }}
+                        </span>
+                        <span *ngIf="txn.compteDestination" class="txn-dest">
+                            <i class="ri-arrow-right-line"></i> {{ txn.compteDestination }}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="txn-amount-wrapper">
+                    <div class="txn-amount" [ngClass]="getTxnAmountClass(txn.type)">
+                        {{ getTxnSign(txn.type) }}{{ txn.montant | number:'1.0-0' }} FCFA
+                    </div>
+                    <div *ngIf="txn.soldeApres !== undefined" class="txn-balance">
+                        Solde: {{ txn.soldeApres | number:'1.0-0' }} FCFA
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty State - With Account -->
+    <div *ngIf="!isLoading && transactions.length === 0 && !errorMessage && accountId"
+        class="empty-state-card animate-slide-in">
+        <div class="empty-state-content">
+            <div class="empty-state-illustration">
+                <div class="empty-icon-wrapper">
+                    <i class="ri-exchange-funds-line"></i>
+                </div>
+                <div class="empty-decoration"></div>
+            </div>
+
+            <h2 class="empty-title">Aucune transaction</h2>
+            <p class="empty-description">
+                Ce compte n'a pas encore d'historique de transactions.<br>
+                Effectuez votre première opération dès maintenant.
+            </p>
+
+            <a [routerLink]="['/transactions/new']" [queryParams]="{accountId: accountId}"
+                class="btn btn-primary btn-lg">
+                <i class="ri-add-line"></i> Effectuer une transaction
+            </a>
+
+            <div class="empty-features">
+                <div class="empty-feature">
+                    <i class="ri-arrow-down-circle-line"></i>
+                    <span>Dépôts</span>
+                </div>
+                <div class="empty-feature">
+                    <i class="ri-arrow-up-circle-line"></i>
+                    <span>Retraits</span>
+                </div>
+                <div class="empty-feature">
+                    <i class="ri-swap-line"></i>
+                    <span>Virements</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty State - All Transactions -->
+    <div *ngIf="!isLoading && transactions.length === 0 && !errorMessage && !accountId"
+        class="empty-state-card animate-slide-in">
+        <div class="empty-state-content">
+            <div class="empty-state-illustration">
+                <div class="empty-icon-wrapper">
+                    <i class="ri-history-line"></i>
+                </div>
+                <div class="empty-decoration"></div>
+            </div>
+
+            <h2 class="empty-title">Aucune transaction enregistrée</h2>
+            <p class="empty-description">
+                Le système n'a pas encore enregistré de transactions.<br>
+                Sélectionnez un compte pour effectuer votre première opération.
+            </p>
+
+            <div class="empty-actions">
+                <a routerLink="/accounts" class="btn btn-secondary">
+                    <i class="ri-wallet-3-line"></i> Voir les comptes
+                </a>
+                <a routerLink="/transactions/new" class="btn btn-primary">
+                    <i class="ri-add-line"></i> Nouvelle transaction
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-container {
+        padding: 1.5rem 2rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+        gap: 1rem;
+    }
+
+    .page-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.025em;
+        margin-bottom: 0.25rem;
+    }
+
+    .page-subtitle {
+        color: #64748b;
+        font-size: 0.9375rem;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 0.75rem;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+    }
+
+    .stat-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 1rem;
+        padding: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .stat-card.highlight {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        border: none;
+    }
+
+    .stat-card.highlight .stat-label {
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    .stat-card.highlight .stat-value {
+        color: white !important;
+    }
+
+    .stat-card.highlight .stat-icon {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: rgba(59, 130, 246, 0.1);
+        color: #3b82f6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        flex-shrink: 0;
+    }
+
+    .stat-icon.purple {
+        background: rgba(139, 92, 246, 0.1);
+        color: #8b5cf6;
+    }
+
+    .stat-icon.cyan {
+        background: rgba(6, 182, 212, 0.1);
+        color: #06b6d4;
+    }
+
+    .stat-icon.orange {
+        background: rgba(249, 115, 22, 0.1);
+        color: #f97316;
+    }
+
+    .stat-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-value {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1e293b;
+    }
+
+    .stat-value.positive {
+        color: #059669;
+    }
+
+    .stat-value.negative {
+        color: #dc2626;
+    }
+
+    .stat-value.mono {
+        font-family: 'SF Mono', Monaco, monospace;
+        font-size: 1rem;
+        letter-spacing: -0.02em;
+    }
+
+    /* Card */
+    .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #f1f5f9;
+        background: #f8fafc;
+    }
+
+    .card-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    .card-title i {
+        color: #3b82f6;
+    }
+
+    .transaction-count {
+        background: #e2e8f0;
+        color: #475569;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.25rem 0.625rem;
+        border-radius: 20px;
+    }
+
+    /* Transactions List */
+    .transactions-list {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+
+    .transaction-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #f1f5f9;
+        transition: background 0.15s;
+    }
+
+    .transaction-item:hover {
+        background: #f8fafc;
+    }
+
+    .transaction-item:last-child {
+        border-bottom: none;
+    }
+
+    .txn-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+        transition: transform 0.2s;
+    }
+
+    .transaction-item:hover .txn-icon {
+        transform: scale(1.05);
+    }
+
+    .txn-icon.deposit {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+
+    .txn-icon.withdrawal {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+
+    .txn-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .txn-title {
+        font-weight: 600;
+        color: #1e293b;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .txn-account {
+        font-family: 'SF Mono', Monaco, monospace;
+        font-size: 0.7rem;
+        background: #f1f5f9;
+        color: #64748b;
+        padding: 0.125rem 0.5rem;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+
+    .txn-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-top: 0.25rem;
+        font-size: 0.8125rem;
+        color: #64748b;
+        flex-wrap: wrap;
+    }
+
+    .txn-desc {
+        font-weight: 500;
+        color: #475569;
+    }
+
+    .txn-date {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .txn-dest {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        background: #f8fafc;
+        padding: 0.125rem 0.375rem;
+        border-radius: 4px;
+        border: 1px solid #e2e8f0;
+        font-family: 'SF Mono', Monaco, monospace;
+        font-size: 0.75rem;
+    }
+
+    .txn-amount-wrapper {
+        text-align: right;
+    }
+
+    .txn-amount {
+        font-family: 'SF Mono', Monaco, monospace;
+        font-weight: 700;
+        font-size: 1rem;
+    }
+
+    .txn-amount.text-success {
+        color: #059669;
+    }
+
+    .txn-amount.text-danger {
+        color: #dc2626;
+    }
+
+    .txn-balance {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        margin-top: 0.25rem;
+        font-family: 'SF Mono', Monaco, monospace;
+    }
+
+    /* Skeleton */
+    .transaction-skeleton {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    /* Empty State */
+    .empty-state-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 1.5rem;
+        padding: 4rem 2rem;
+        text-align: center;
+    }
+
+    .empty-state-content {
+        max-width: 400px;
+        margin: 0 auto;
+    }
+
+    .empty-state-illustration {
+        position: relative;
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 2rem;
+    }
+
+    .empty-icon-wrapper {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        color: #cbd5e1;
+        position: relative;
+        z-index: 1;
+    }
+
+    .empty-decoration {
+        position: absolute;
+        top: -10px;
+        left: -10px;
+        right: -10px;
+        bottom: -10px;
+        border: 2px dashed #e2e8f0;
+        border-radius: 50%;
+        animation: rotate 30s linear infinite;
+    }
+
+    @keyframes rotate {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .empty-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 0.75rem;
+    }
+
+    .empty-description {
+        color: #64748b;
+        font-size: 0.9375rem;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+    }
+
+    .empty-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: center;
+    }
+
+    .empty-features {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin-top: 2.5rem;
+        padding-top: 2rem;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .empty-feature {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        color: #64748b;
+        font-size: 0.8125rem;
+    }
+
+    .empty-feature i {
+        font-size: 1.5rem;
+        color: #3b82f6;
+    }
+
+    @media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+        }
+
+        .header-actions {
+            width: 100%;
+        }
+
+        .header-actions .btn {
+            flex: 1;
+        }
+
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .empty-features {
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .empty-actions {
+            flex-direction: column;
+        }
+    }
+
+    /* Statement Modal Styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 16px;
+        padding: 2rem;
+        width: 100%;
+        max-width: 420px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        animation: modalSlideIn 0.3s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-20px) scale(0.95);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    .modal-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .modal-header i {
+        font-size: 1.5rem;
+        color: #3b82f6;
+    }
+
+    .modal-header h3 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0;
+    }
+
+    .modal-body {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .form-group label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #64748b;
+    }
+
+    .form-group input {
+        padding: 0.75rem 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-group input:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .modal-error {
+        background: #fef2f2;
+        color: #dc2626;
+        padding: 0.75rem;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .modal-actions {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+    }
+
+    .modal-actions .btn {
+        flex: 1;
+    }
+
+    .btn-download {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+        border: none;
+    }
+
+    .btn-download:hover {
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-download:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .spinner-sm {
+        width: 16px;
+        height: 16px;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.75s linear infinite;
+    }
+</style>
+
+<!-- Statement Download Modal -->
+<div *ngIf="showStatementModal" class="modal-overlay" (click)="closeStatementModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+            <i class="ri-file-pdf-line"></i>
+            <h3>Télécharger le relevé</h3>
+        </div>
+
+        <div class="modal-body">
+            <p style="color: #64748b; margin: 0 0 0.5rem 0;">
+                Compte: <strong>{{ accountId }}</strong>
+            </p>
+
+            <div class="form-group">
+                <label for="startDate">Date de début</label>
+                <input type="date" id="startDate" [(ngModel)]="statementStartDate">
+            </div>
+
+            <div class="form-group">
+                <label for="endDate">Date de fin</label>
+                <input type="date" id="endDate" [(ngModel)]="statementEndDate">
+            </div>
+
+            <div *ngIf="downloadError" class="modal-error">
+                <i class="ri-error-warning-line"></i>
+                {{ downloadError }}
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button (click)="closeStatementModal()" class="btn btn-secondary">Annuler</button>
+            <button (click)="downloadStatement()" [disabled]="isDownloading" class="btn btn-download">
+                <span *ngIf="isDownloading" class="spinner-sm"></span>
+                <i *ngIf="!isDownloading" class="ri-download-line"></i>
+                {{ isDownloading ? 'Téléchargement...' : 'Télécharger' }}
+            </button>
+        </div>
+    </div>
+</div>

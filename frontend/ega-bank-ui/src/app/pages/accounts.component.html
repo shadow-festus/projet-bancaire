@@ -1,0 +1,406 @@
+<div class="page-container">
+    <!-- Page Header -->
+    <header class="page-header animate-slide-in">
+        <div class="header-content">
+            <h1 class="page-title">{{ isAdmin ? 'Gestion des Comptes' : 'Mes Comptes' }}</h1>
+            <p class="page-subtitle">{{ isAdmin ? 'Aperçu de tous les comptes clients et leurs avoirs financiers.' :
+                'Consultez le solde et l\'historique de vos comptes.' }}</p>
+        </div>
+        <a routerLink="/accounts/new" class="btn btn-primary">
+            <i class="ri-add-circle-line"></i> Ouvrir un Compte
+        </a>
+    </header>
+
+    <!-- Error State -->
+    <div *ngIf="errorMessage && !isLoading" class="alert alert-danger mb-6 animate-slide-in">
+        <i class="ri-error-warning-line text-xl"></i>
+        <div class="flex-1">
+            <div class="font-semibold">Erreur de chargement</div>
+            <div class="text-sm opacity-80">{{ errorMessage }}</div>
+        </div>
+        <button (click)="loadAccounts()" class="btn btn-secondary btn-sm">
+            <i class="ri-refresh-line"></i> Réessayer
+        </button>
+    </div>
+
+    <!-- Loading State (Skeleton) -->
+    <div *ngIf="isLoading" class="card overflow-hidden animate-slide-in">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Compte</th>
+                        <th>Client</th>
+                        <th>Statut</th>
+                        <th>Créé le</th>
+                        <th class="text-right">Solde</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr *ngFor="let i of [1,2,3,4,5]">
+                        <td>
+                            <div class="flex items-center gap-3">
+                                <div class="skeleton" style="width: 40px; height: 40px; border-radius: 10px;"></div>
+                                <div>
+                                    <div class="skeleton skeleton-text mb-2" style="width: 100px;"></div>
+                                    <div class="skeleton skeleton-text" style="width: 140px; height: 0.7rem;"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="skeleton skeleton-text" style="width: 120px;"></div>
+                        </td>
+                        <td>
+                            <div class="skeleton" style="width: 70px; height: 24px; border-radius: 20px;"></div>
+                        </td>
+                        <td>
+                            <div class="skeleton skeleton-text" style="width: 100px;"></div>
+                        </td>
+                        <td>
+                            <div class="skeleton skeleton-text ml-auto" style="width: 90px;"></div>
+                        </td>
+                        <td class="text-center">
+                            <div class="skeleton mx-auto" style="width: 100px; height: 32px; border-radius: 8px;"></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Accounts Table -->
+    <div *ngIf="!isLoading && accounts.length > 0" class="card overflow-hidden animate-slide-in">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Compte</th>
+                        <th *ngIf="isAdmin">Client</th>
+                        <th>Statut</th>
+                        <th>Créé le</th>
+                        <th class="text-right">Solde</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr *ngFor="let account of accounts">
+                        <td>
+                            <div class="account-cell">
+                                <div class="account-icon">
+                                    <i class="ri-wallet-3-line"></i>
+                                </div>
+                                <div>
+                                    <div class="account-type">{{ getTypeDisplay(account.typeCompte) }}</div>
+                                    <div class="account-number">{{ account.numeroCompte }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td *ngIf="isAdmin">
+                            <span *ngIf="account.clientNomComplet" class="client-name">
+                                <i class="ri-user-3-line"></i>
+                                {{ account.clientNomComplet }}
+                            </span>
+                            <span *ngIf="!account.clientNomComplet" class="text-gray-400 italic">
+                                Client #{{ account.clientId }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="status-badge" [class.active]="account.actif" [class.inactive]="!account.actif">
+                                <i [class]="account.actif ? 'ri-checkbox-circle-fill' : 'ri-close-circle-fill'"></i>
+                                {{ getStatusDisplay(account.actif) }}
+                            </span>
+                        </td>
+                        <td class="date-cell">
+                            <i class="ri-calendar-line"></i>
+                            {{ account.dateCreation | date:'dd MMM yyyy' }}
+                        </td>
+                        <td class="text-right">
+                            <div class="balance" [class.positive]="account.solde > 0"
+                                [class.negative]="account.solde < 0">
+                                {{ account.solde | number:'1.0-0' }} <span class="currency">FCFA</span>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <button (click)="viewTransactions(account.numeroCompte)" class="btn btn-secondary btn-sm">
+                                <i class="ri-exchange-funds-line"></i> Transactions
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="!isLoading && accounts.length === 0 && !errorMessage" class="empty-state-card animate-slide-in">
+        <div class="empty-state-content">
+            <div class="empty-state-illustration">
+                <div class="empty-icon-wrapper">
+                    <i class="ri-wallet-3-line"></i>
+                </div>
+                <div class="empty-decoration"></div>
+            </div>
+
+            <h2 class="empty-title">{{ isAdmin ? 'Aucun compte bancaire' : 'Vous n\'avez pas encore de compte' }}</h2>
+            <p class="empty-description">
+                {{ isAdmin ? 'Commencez par ouvrir le premier compte pour vos clients.' : 'Veuillez contacter votre
+                conseiller pour ouvrir un compte.' }}<br>
+                {{ isAdmin ? 'Les comptes permettent de gérer les dépôts, retraits et virements.' : '' }}
+            </p>
+
+            <a routerLink="/accounts/new" class="btn btn-primary btn-lg" *ngIf="isAdmin">
+                <i class="ri-add-line"></i> Ouvrir le premier compte
+            </a>
+
+            <div class="empty-features">
+                <div class="empty-feature">
+                    <i class="ri-shield-check-line"></i>
+                    <span>Comptes sécurisés</span>
+                </div>
+                <div class="empty-feature">
+                    <i class="ri-exchange-funds-line"></i>
+                    <span>Virements instantanés</span>
+                </div>
+                <div class="empty-feature">
+                    <i class="ri-history-line"></i>
+                    <span>Historique complet</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-container {
+        padding: 1.5rem 2rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+        gap: 1rem;
+    }
+
+    .page-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.025em;
+        margin-bottom: 0.25rem;
+    }
+
+    .page-subtitle {
+        color: #64748b;
+        font-size: 0.9375rem;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    /* Account Cell */
+    .account-cell {
+        display: flex;
+        align-items: center;
+        gap: 0.875rem;
+    }
+
+    .account-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.05));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #3b82f6;
+        font-size: 1.25rem;
+    }
+
+    .account-type {
+        font-weight: 600;
+        color: #1e293b;
+        font-size: 0.9375rem;
+    }
+
+    .account-number {
+        font-family: 'SF Mono', Monaco, monospace;
+        font-size: 0.75rem;
+        color: #64748b;
+        letter-spacing: 0.02em;
+    }
+
+    /* Client Name */
+    .client-name {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #475569;
+        font-weight: 500;
+    }
+
+    .client-name i {
+        color: #94a3b8;
+    }
+
+    /* Status Badge */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .status-badge.active {
+        background: rgba(16, 185, 129, 0.1);
+        color: #059669;
+    }
+
+    .status-badge.inactive {
+        background: rgba(239, 68, 68, 0.1);
+        color: #dc2626;
+    }
+
+    /* Date Cell */
+    .date-cell {
+        color: #64748b;
+        font-size: 0.875rem;
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+    }
+
+    .date-cell i {
+        color: #94a3b8;
+    }
+
+    /* Balance */
+    .balance {
+        font-family: 'SF Mono', Monaco, monospace;
+        font-weight: 700;
+        font-size: 1rem;
+        color: #1e293b;
+    }
+
+    .balance.positive {
+        color: #059669;
+    }
+
+    .balance.negative {
+        color: #dc2626;
+    }
+
+    .balance .currency {
+        font-size: 0.75rem;
+        font-weight: 500;
+        opacity: 0.7;
+    }
+
+    /* Empty State */
+    .empty-state-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 1.5rem;
+        padding: 4rem 2rem;
+        text-align: center;
+    }
+
+    .empty-state-content {
+        max-width: 400px;
+        margin: 0 auto;
+    }
+
+    .empty-state-illustration {
+        position: relative;
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 2rem;
+    }
+
+    .empty-icon-wrapper {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        color: #cbd5e1;
+        position: relative;
+        z-index: 1;
+    }
+
+    .empty-decoration {
+        position: absolute;
+        top: -10px;
+        left: -10px;
+        right: -10px;
+        bottom: -10px;
+        border: 2px dashed #e2e8f0;
+        border-radius: 50%;
+        animation: rotate 30s linear infinite;
+    }
+
+    @keyframes rotate {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .empty-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 0.75rem;
+    }
+
+    .empty-description {
+        color: #64748b;
+        font-size: 0.9375rem;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+    }
+
+    .empty-features {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin-top: 2.5rem;
+        padding-top: 2rem;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .empty-feature {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        color: #64748b;
+        font-size: 0.8125rem;
+    }
+
+    .empty-feature i {
+        font-size: 1.5rem;
+        color: #3b82f6;
+    }
+
+    @media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+        }
+
+        .empty-features {
+            flex-direction: column;
+            gap: 1rem;
+        }
+    }
+</style>

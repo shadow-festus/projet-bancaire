@@ -1,0 +1,391 @@
+<div class="page-container">
+    <!-- Page Header -->
+    <header class="page-header animate-slide-in">
+        <div class="header-content">
+            <h1 class="page-title">Gestion des Clients</h1>
+            <p class="page-subtitle">Gérez vos clients et leurs comptes bancaires.</p>
+        </div>
+        <a routerLink="/clients/new" class="btn btn-primary">
+            <i class="ri-user-add-line"></i> Ajouter un Client
+        </a>
+    </header>
+
+    <!-- Error State -->
+    <div *ngIf="errorMessage && !isLoading" class="alert alert-danger mb-6 animate-slide-in">
+        <i class="ri-error-warning-line text-xl"></i>
+        <div class="flex-1">
+            <div class="font-semibold">Erreur de chargement</div>
+            <div class="text-sm opacity-80">{{ errorMessage }}</div>
+        </div>
+        <button (click)="loadClients()" class="btn btn-secondary btn-sm">
+            <i class="ri-refresh-line"></i> Réessayer
+        </button>
+    </div>
+
+    <!-- Loading State (Skeleton) -->
+    <div *ngIf="isLoading" class="clients-grid animate-slide-in">
+        <div *ngFor="let i of [1,2,3,4,5,6]" class="client-card skeleton-card">
+            <div class="client-card-header">
+                <div class="skeleton" style="width: 48px; height: 48px; border-radius: 12px;"></div>
+                <div class="flex-1">
+                    <div class="skeleton skeleton-text mb-2" style="width: 60%;"></div>
+                    <div class="skeleton skeleton-text" style="width: 40%; height: 0.7rem;"></div>
+                </div>
+            </div>
+            <div class="client-card-body">
+                <div class="skeleton skeleton-text mb-2"></div>
+                <div class="skeleton skeleton-text" style="width: 80%;"></div>
+            </div>
+            <div class="client-card-footer">
+                <div class="skeleton" style="height: 36px; flex: 1; border-radius: 8px;"></div>
+                <div class="skeleton" style="height: 36px; flex: 1; border-radius: 8px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clients Grid -->
+    <div *ngIf="!isLoading && clients.length > 0" class="clients-grid">
+        <div *ngFor="let client of clients; let i = index" class="client-card animate-slide-in"
+            [style.animation-delay]="i * 50 + 'ms'">
+
+            <div class="client-card-header">
+                <div class="client-avatar">
+                    {{ client.prenom.charAt(0) }}{{ client.nom.charAt(0) }}
+                </div>
+                <div class="client-info">
+                    <h3 class="client-name">{{ client.prenom }} {{ client.nom }}</h3>
+                    <span class="client-id">Client #{{ client.id }}</span>
+                </div>
+                <span class="accounts-badge" [class.has-accounts]="(client.nombreComptes || 0) > 0">
+                    <i class="ri-wallet-3-line"></i>
+                    {{ client.nombreComptes || 0 }} compte{{ (client.nombreComptes || 0) > 1 ? 's' : '' }}
+                </span>
+            </div>
+
+            <div class="client-card-body">
+                <div class="contact-item" *ngIf="client.courriel">
+                    <i class="ri-mail-line"></i>
+                    <span>{{ client.courriel }}</span>
+                </div>
+                <div class="contact-item" *ngIf="client.telephone">
+                    <i class="ri-phone-line"></i>
+                    <span>{{ client.telephone }}</span>
+                </div>
+            </div>
+
+            <div class="client-card-footer">
+                <button (click)="viewDetails(client.id)" class="btn btn-secondary btn-sm">
+                    <i class="ri-edit-line"></i> Modifier
+                </button>
+                <button (click)="viewAccounts(client.id)" class="btn btn-primary btn-sm">
+                    <i class="ri-wallet-3-line"></i> Comptes
+                </button>
+                <button (click)="deleteClient(client.id)" class="btn btn-icon btn-danger-soft" title="Supprimer">
+                    <i class="ri-delete-bin-line"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="!isLoading && clients.length === 0 && !errorMessage" class="empty-state-card animate-slide-in">
+        <div class="empty-state-content">
+            <div class="empty-state-illustration">
+                <div class="empty-icon-wrapper">
+                    <i class="ri-user-3-line"></i>
+                </div>
+                <div class="empty-decoration"></div>
+            </div>
+
+            <h2 class="empty-title">Aucun client enregistré</h2>
+            <p class="empty-description">
+                Commencez par ajouter votre premier client.<br>
+                Les clients peuvent ensuite ouvrir des comptes bancaires.
+            </p>
+
+            <a routerLink="/clients/new" class="btn btn-primary btn-lg">
+                <i class="ri-add-line"></i> Ajouter le premier client
+            </a>
+
+            <div class="empty-features">
+                <div class="empty-feature">
+                    <i class="ri-user-star-line"></i>
+                    <span>Gestion simplifiée</span>
+                </div>
+                <div class="empty-feature">
+                    <i class="ri-bank-card-line"></i>
+                    <span>Multi-comptes</span>
+                </div>
+                <div class="empty-feature">
+                    <i class="ri-shield-user-line"></i>
+                    <span>Données sécurisées</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .page-container {
+        padding: 1.5rem 2rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        margin-bottom: 1.5rem;
+        gap: 1rem;
+    }
+
+    .page-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #0f172a;
+        letter-spacing: -0.025em;
+        margin-bottom: 0.25rem;
+    }
+
+    .page-subtitle {
+        color: #64748b;
+        font-size: 0.9375rem;
+    }
+
+    /* Clients Grid */
+    .clients-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 1.25rem;
+    }
+
+    /* Client Card */
+    .client-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 1rem;
+        overflow: hidden;
+        transition: all 0.2s;
+    }
+
+    .client-card:hover {
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        transform: translateY(-2px);
+    }
+
+    .client-card-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.25rem;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .client-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1rem;
+        flex-shrink: 0;
+    }
+
+    .client-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .client-name {
+        font-size: 1.0625rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 0.125rem;
+    }
+
+    .client-id {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        font-family: 'SF Mono', Monaco, monospace;
+    }
+
+    .accounts-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: #fef3c7;
+        color: #b45309;
+    }
+
+    .accounts-badge.has-accounts {
+        background: rgba(16, 185, 129, 0.1);
+        color: #059669;
+    }
+
+    .client-card-body {
+        padding: 1rem 1.25rem;
+        min-height: 70px;
+    }
+
+    .contact-item {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        font-size: 0.875rem;
+        color: #475569;
+        margin-bottom: 0.5rem;
+    }
+
+    .contact-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .contact-item i {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: #f8fafc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #64748b;
+        font-size: 1rem;
+    }
+
+    .client-card-footer {
+        display: flex;
+        gap: 0.5rem;
+        padding: 1rem 1.25rem;
+        background: #f8fafc;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .client-card-footer .btn {
+        flex: 1;
+        justify-content: center;
+    }
+
+    .client-card-footer .btn-icon {
+        flex: 0;
+        width: 36px;
+        padding: 0;
+    }
+
+    /* Empty State */
+    .empty-state-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 1.5rem;
+        padding: 4rem 2rem;
+        text-align: center;
+    }
+
+    .empty-state-content {
+        max-width: 400px;
+        margin: 0 auto;
+    }
+
+    .empty-state-illustration {
+        position: relative;
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 2rem;
+    }
+
+    .empty-icon-wrapper {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        color: #cbd5e1;
+        position: relative;
+        z-index: 1;
+    }
+
+    .empty-decoration {
+        position: absolute;
+        top: -10px;
+        left: -10px;
+        right: -10px;
+        bottom: -10px;
+        border: 2px dashed #e2e8f0;
+        border-radius: 50%;
+        animation: rotate 30s linear infinite;
+    }
+
+    @keyframes rotate {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .empty-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 0.75rem;
+    }
+
+    .empty-description {
+        color: #64748b;
+        font-size: 0.9375rem;
+        line-height: 1.6;
+        margin-bottom: 2rem;
+    }
+
+    .empty-features {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin-top: 2.5rem;
+        padding-top: 2rem;
+        border-top: 1px solid #f1f5f9;
+    }
+
+    .empty-feature {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        color: #64748b;
+        font-size: 0.8125rem;
+    }
+
+    .empty-feature i {
+        font-size: 1.5rem;
+        color: #3b82f6;
+    }
+
+    /* Skeleton */
+    .skeleton-card {
+        pointer-events: none;
+    }
+
+    @media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+        }
+
+        .clients-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .empty-features {
+            flex-direction: column;
+            gap: 1rem;
+        }
+    }
+</style>
